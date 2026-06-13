@@ -1,45 +1,33 @@
 # TASK3
-import pandas as pd
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+#image caption
+from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoTokenizer
+import torch
+from PIL import Image
 
-# Dataset
-data = {
-    "title": [
-        "AI internship guide for beginners",
-        "How to get data science internship",
-        "Web development internship roadmap",
-        "Machine learning internship preparation",
-        "Top skills for software internships",
-        "Python projects for internship",
-        "How to crack internship interviews",
-        "Resume tips for internships"
-    ]
-}
+# Load model
+model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+feature_extractor = ViTImageProcessor.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+tokenizer = AutoTokenizer.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
 
-df = pd.DataFrame(data)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
 
-# Recommendation function
-def recommend(user_input):
-    # Combine dataset + user input
-    all_titles = df["title"].tolist()
-    all_titles.append(user_input)
+# Your image path (already correct)
+image_path = r"C:\Users\HP\Downloads\pexels-muhammed-mahsum-tunc-859110584-35389656.jpg"
 
-    # Convert text to vectors
-    cv = CountVectorizer()
-    matrix = cv.fit_transform(all_titles)
+# Open image
+image = Image.open(image_path)
 
-    # Similarity
-    similarity = cosine_similarity(matrix)
+if image.mode != "RGB":
+    image = image.convert(mode="RGB")
 
-    # Last index = user input
-    scores = list(enumerate(similarity[-1]))
-    scores = sorted(scores, key=lambda x: x[1], reverse=True)
+# Process image
+pixel_values = feature_extractor(images=image, return_tensors="pt").pixel_values
+pixel_values = pixel_values.to(device)
 
-    print("\n🎯 Recommended Videos:\n")
-    for i in scores[1:4]:
-        print(all_titles[i[0]])
+# Generate caption
+output_ids = model.generate(pixel_values, max_length=16, num_beams=4)
 
-# User input
-user_input = input("Enter topic: ")
-recommend(user_input)
+caption = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+print("\nGenerated Caption:", caption)
